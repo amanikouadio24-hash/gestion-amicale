@@ -264,7 +264,7 @@ elif section == "Gestion des Membres":
 
   with tab2:
     st.subheader("Enregistrer un nouveau membre")
-    with st.form("form_ajout_membre"):
+  with st.form("form_ajout_membre", clear_on_submit=True):
       id_membre = st.text_input(
           "ID Membre (ex: AMA-001)",
           value=f"AMA-{len(df_membres)+1:03d}",
