@@ -4,9 +4,7 @@ import streamlit as st
 
 # Configuration de la page Streamlit
 st.set_page_config(
-    page_title="Logiciel de Gestion Financière - Amicale",
-    page_icon="🤝",
-    layout="wide",
+    page_title="AMADIS - Gestion Financière", page_icon="🏥", layout="wide"
 )
 
 # Nom du fichier de base de données Excel persistant
@@ -69,10 +67,8 @@ def load_data():
     if "Membres" in sheets:
       df_membres = pd.read_excel(DB_FILE, sheet_name="Membres", dtype=str)
       df_membres.columns = df_membres.columns.str.strip()
-      # Supprimer les colonnes en double s'il y en a
       df_membres = df_membres.loc[:, ~df_membres.columns.duplicated()]
 
-      # S'assurer d'avoir exactement les bonnes colonnes dans le bon ordre
       colonnes_officielles = [
           "ID Membre",
           "Nom et Prénoms",
@@ -139,89 +135,6 @@ def load_data():
 
     return df_membres, df_cotisations, df_evenements, df_depenses
   except Exception as e:
-    # Réinitialisation propre en cas d'erreur
-    df_membres = pd.DataFrame(
-        columns=[
-            "ID Membre",
-            "Nom et Prénoms",
-            "Contact",
-            "Date Adhesion",
-            "Statut",
-        ]
-    )
-    df_cotisations = pd.DataFrame(
-        columns=[
-            "ID Membre",
-            "Nom et Prénoms",
-            "Mois",
-            "Année",
-            "Montant",
-            "Date Paiement",
-        ]
-    )
-    df_evenements = pd.DataFrame(
-        columns=[
-            "ID Membre",
-            "Nom et Prénoms",
-            "Type Evenement",
-            "Montant Verse",
-            "Date",
-            "Assistance Anterieure",
-        ]
-    )
-    df_depenses = pd.DataFrame(
-        columns=["Libelle", "Montant", "Date", "Categorie"]
-    )
-    save_data(df_membres, df_cotisations, df_evenements, df_depenses)
-    return df_membres, df_cotisations, df_evenements, df_depenses
-
-    # Cotisations
-    if "Cotisations" in sheets:
-      df_cotisations = pd.read_excel(
-          DB_FILE, sheet_name="Cotisations", dtype=str
-      )
-      df_cotisations.columns = df_cotisations.columns.str.strip()
-    else:
-      df_cotisations = pd.DataFrame(
-          columns=[
-              "ID Membre",
-              "Nom et Prénoms",
-              "Mois",
-              "Année",
-              "Montant",
-              "Date Paiement",
-          ]
-      )
-
-    # Evenements
-    if "Evenements" in sheets:
-      df_evenements = pd.read_excel(
-          DB_FILE, sheet_name="Evenements", dtype=str
-      )
-      df_evenements.columns = df_evenements.columns.str.strip()
-    else:
-      df_evenements = pd.DataFrame(
-          columns=[
-              "ID Membre",
-              "Nom et Prénoms",
-              "Type Evenement",
-              "Montant Verse",
-              "Date",
-              "Assistance Anterieure",
-          ]
-      )
-
-    # Depenses
-    if "Depenses" in sheets:
-      df_depenses = pd.read_excel(DB_FILE, sheet_name="Depenses", dtype=str)
-      df_depenses.columns = df_depenses.columns.str.strip()
-    else:
-      df_depenses = pd.DataFrame(
-          columns=["Libelle", "Montant", "Date", "Categorie"]
-      )
-
-    return df_membres, df_cotisations, df_evenements, df_depenses
-  except Exception as e:
     df_membres = pd.DataFrame(
         columns=[
             "ID Membre",
@@ -283,7 +196,7 @@ def valider_telephone_ivoirien(tel):
 df_membres, df_cotisations, df_evenements, df_depenses = load_data()
 
 # Barre latérale de navigation
-st.sidebar.title("Navigation")
+st.sidebar.title("🏥 Navigation AMADIS")
 section = st.sidebar.selectbox(
     "Choisir une section",
     [
@@ -306,8 +219,8 @@ if st.sidebar.button("Imprimer / Exporter cette page"):
 # 1. TABLEAU DE BORD
 # ---------------------------------------------------------
 if section == "Tableau de Bord":
-  st.title("🤝 Logiciel de Gestion Financière - Amicale")
-  st.markdown("### 📊 Vue d'ensemble de la Trésorerie")
+  st.title("🏥 AMICALE DES AGENTS DE SANTÉ DE GUÉYO (AMADIS)")
+  st.markdown("### 📊 Tableau de Bord & Trésorerie")
 
   total_cotiz = (
       pd.to_numeric(df_cotisations["Montant"], errors="coerce").sum()
@@ -327,20 +240,23 @@ if section == "Tableau de Bord":
   col3.metric("Total Dépenses / Sorties", f"{total_dep:,.0f} FCFA")
 
   st.markdown("---")
-  st.info("💡 Utilisez le menu à gauche pour naviguer dans le logiciel.")
+  st.info(
+      "💡 Bienvenue sur le logiciel de gestion financière de l'AMADIS. Utilisez"
+      " le menu latéral pour naviguer."
+  )
 
 # ---------------------------------------------------------
 # 2. GESTION DES MEMBRES
 # ---------------------------------------------------------
 elif section == "Gestion des Membres":
-  st.title("👥 Gestion des Membres de l'Amicale")
+  st.title("👥 Gestion des Membres - AMADIS")
 
   tab1, tab2, tab3 = st.tabs(
       ["Liste des Membres", "Ajouter un Membre", "Modifier / Supprimer"]
   )
 
   with tab1:
-    st.subheader("Liste officielle")
+    st.subheader("Liste officielle des membres")
     if not df_membres.empty:
       st.dataframe(df_membres, use_container_width=True)
     else:
@@ -350,7 +266,7 @@ elif section == "Gestion des Membres":
     st.subheader("Enregistrer un nouveau membre")
     with st.form("form_ajout_membre"):
       id_membre = st.text_input(
-          "ID Membre (ex: AMA-091)",
+          "ID Membre (ex: AMA-001)",
           value=f"AMA-{len(df_membres)+1:03d}",
       )
       nom = st.text_input("Nom et Prénoms")
@@ -449,7 +365,7 @@ elif section == "Gestion des Membres":
 # 3. COTISATIONS MENSUELLES
 # ---------------------------------------------------------
 elif section == "Cotisations Mensuelles":
-  st.title("💰 Gestion des Cotisations Mensuelles")
+  st.title("💰 Gestion des Cotisations - AMADIS")
   st.markdown("Montant standard par membre : **1 000 FCFA / mois**")
 
   if df_membres.empty:
@@ -519,7 +435,7 @@ elif section == "Cotisations Mensuelles":
 # 4. CALCULATEUR PRÊTS / SECOURS (Règles 60% / 80%)
 # ---------------------------------------------------------
 elif section == "Calculateur Prêts / Secours":
-  st.title("📐 Calculateur des Versements (Règles 60% / 80%)")
+  st.title("📐 Calculateur des Versements - AMADIS")
   st.markdown(
       "Règles financières : **80%** du total si aucune assistance antérieure;"
       " **60%** si déjà perçu."
@@ -569,7 +485,7 @@ elif section == "Calculateur Prêts / Secours":
 # 5. JOURNAL DES DÉPENSES
 # ---------------------------------------------------------
 elif section == "Journal des Dépenses":
-  st.title("💸 Journal des Dépenses et Sorties")
+  st.title("💸 Journal des Dépenses - AMADIS")
 
   with st.form("form_depense"):
     libelle = st.text_input("Libellé de la dépense")
