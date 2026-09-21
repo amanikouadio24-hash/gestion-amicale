@@ -16,7 +16,6 @@ DB_FILE = "base_amicale_python.xlsx"
 def init_db():
   """Initialise le fichier Excel de la base de données s'il n'existe pas."""
   if not os.path.exists(DB_FILE):
-    # Création des structures par défaut
     df_membres = pd.DataFrame(
         columns=[
             "ID Membre",
@@ -61,50 +60,111 @@ init_db()
 
 
 def load_data():
-  """Charge toutes les tables depuis le fichier Excel et crée les feuilles manquantes si besoin."""
+  """Charge toutes les tables depuis le fichier Excel avec normalisation des colonnes."""
   try:
-    # Vérifier quelles feuilles existent dans le fichier Excel
     xls = pd.ExcelFile(DB_FILE)
     sheets = xls.sheet_names
 
-    df_membres = (
-        pd.read_excel(DB_FILE, sheet_name="Membres", dtype=str)
-        if "Membres" in sheets
-        else pd.DataFrame(
-            columns=["ID Membre", "Nom et Prénoms", "Contact", "Date Adhesion", "Statut"]
-        )
-    )
-    df_cotisations = (
-        pd.read_excel(DB_FILE, sheet_name="Cotisations", dtype=str)
-        if "Cotisations" in sheets
-        else pd.DataFrame(
-            columns=["ID Membre", "Nom et Prénoms", "Mois", "Année", "Montant", "Date Paiement"]
-        )
-    )
-    df_evenements = (
-        pd.read_excel(DB_FILE, sheet_name="Evenements", dtype=str)
-        if "Evenements" in sheets
-        else pd.DataFrame(
-            columns=["ID Membre", "Nom et Prénoms", "Type Evenement", "Montant Verse", "Date", "Assistance Anterieure"]
-        )
-    )
-    df_depenses = (
-        pd.read_excel(DB_FILE, sheet_name="Depenses", dtype=str)
-        if "Depenses" in sheets
-        else pd.DataFrame(columns=["Libelle", "Montant", "Date", "Categorie"])
-    )
+    # Membres
+    if "Membres" in sheets:
+      df_membres = pd.read_excel(DB_FILE, sheet_name="Membres", dtype=str)
+      # Normalisation des noms de colonnes si besoin
+      df_membres.columns = df_membres.columns.str.strip()
+      for col in [
+          "ID Membre",
+          "Nom et Prénoms",
+          "Contact",
+          "Date Adhesion",
+          "Statut",
+      ]:
+        if col not in df_membres.columns:
+          df_membres[col] = ""
+    else:
+      df_membres = pd.DataFrame(
+          columns=[
+              "ID Membre",
+              "Nom et Prénoms",
+              "Contact",
+              "Date Adhesion",
+              "Statut",
+          ]
+      )
+
+    # Cotisations
+    if "Cotisations" in sheets:
+      df_cotisations = pd.read_excel(
+          DB_FILE, sheet_name="Cotisations", dtype=str
+      )
+      df_cotisations.columns = df_cotisations.columns.str.strip()
+    else:
+      df_cotisations = pd.DataFrame(
+          columns=[
+              "ID Membre",
+              "Nom et Prénoms",
+              "Mois",
+              "Année",
+              "Montant",
+              "Date Paiement",
+          ]
+      )
+
+    # Evenements
+    if "Evenements" in sheets:
+      df_evenements = pd.read_excel(
+          DB_FILE, sheet_name="Evenements", dtype=str
+      )
+      df_evenements.columns = df_evenements.columns.str.strip()
+    else:
+      df_evenements = pd.DataFrame(
+          columns=[
+              "ID Membre",
+              "Nom et Prénoms",
+              "Type Evenement",
+              "Montant Verse",
+              "Date",
+              "Assistance Anterieure",
+          ]
+      )
+
+    # Depenses
+    if "Depenses" in sheets:
+      df_depenses = pd.read_excel(DB_FILE, sheet_name="Depenses", dtype=str)
+      df_depenses.columns = df_depenses.columns.str.strip()
+    else:
+      df_depenses = pd.DataFrame(
+          columns=["Libelle", "Montant", "Date", "Categorie"]
+      )
 
     return df_membres, df_cotisations, df_evenements, df_depenses
   except Exception as e:
-    # Si le fichier est corrompu ou illisible, on le réinitialise
     df_membres = pd.DataFrame(
-        columns=["ID Membre", "Nom et Prénoms", "Contact", "Date Adhesion", "Statut"]
+        columns=[
+            "ID Membre",
+            "Nom et Prénoms",
+            "Contact",
+            "Date Adhesion",
+            "Statut",
+        ]
     )
     df_cotisations = pd.DataFrame(
-        columns=["ID Membre", "Nom et Prénoms", "Mois", "Année", "Montant", "Date Paiement"]
+        columns=[
+            "ID Membre",
+            "Nom et Prénoms",
+            "Mois",
+            "Année",
+            "Montant",
+            "Date Paiement",
+        ]
     )
     df_evenements = pd.DataFrame(
-        columns=["ID Membre", "Nom et Prénoms", "Type Evenement", "Montant Verse", "Date", "Assistance Anterieure"]
+        columns=[
+            "ID Membre",
+            "Nom et Prénoms",
+            "Type Evenement",
+            "Montant Verse",
+            "Date",
+            "Assistance Anterieure",
+        ]
     )
     df_depenses = pd.DataFrame(
         columns=["Libelle", "Montant", "Date", "Categorie"]
@@ -112,8 +172,9 @@ def load_data():
     save_data(df_membres, df_cotisations, df_evenements, df_depenses)
     return df_membres, df_cotisations, df_evenements, df_depenses
 
+
 def save_data(df_membres, df_cotisations, df_evenements, df_depenses):
-  """Sauvegarde toutes les tables dans le fichier Excel avec gestion des types."""
+  """Sauvegarde toutes les tables dans le fichier Excel."""
   with pd.ExcelWriter(DB_FILE, engine="openpyxl") as writer:
     df_membres.to_excel(writer, sheet_name="Membres", index=False)
     df_cotisations.to_excel(writer, sheet_name="Cotisations", index=False)
@@ -125,16 +186,13 @@ def valider_telephone_ivoirien(tel):
   """Vérifie et formate un numéro de téléphone selon les standards ivoiriens (10 chiffres)."""
   if not tel or pd.isna(tel):
     return ""
-  # Nettoyage des espaces et tirets
   tel_clean = "".join(filter(str.isdigit, str(tel)))
   if tel_clean.startswith("225") and len(tel_clean) == 13:
-    tel_clean = tel_clean[3:]  # Retirer l'indicatif pays si présent
+    tel_clean = tel_clean[3:]
   if len(tel_clean) == 10:
-    # Format standard ivoirien (ex: 07 00 00 00 00)
     return f"{tel_clean[0:2]} {tel_clean[2:4]} {tel_clean[4:6]} {tel_clean[6:8]} {tel_clean[8:10]}"
-  return str(
-      tel
-  ).strip()  # Retourne le numéro brut si le format n'est pas reconnu
+  return str(tel).strip()
+
 
 # Chargement initial
 df_membres, df_cotisations, df_evenements, df_depenses = load_data()
@@ -152,16 +210,12 @@ section = st.sidebar.selectbox(
     ],
 )
 
-# Option d'impression globale accessible sur toutes les pages
+# Option d'impression globale
 st.sidebar.markdown("---")
 st.sidebar.subheader("🖨️ Impression & Export")
 if st.sidebar.button("Imprimer / Exporter cette page"):
-  st.markdown(
-      "<script>window.print();</script>", unsafe_allow_html=True
-  )
-  st.sidebar.success(
-      "Fenêtre d'impression ouverte ! (Vous pouvez enregistrer en PDF)."
-  )
+  st.markdown("<script>window.print();</script>", unsafe_allow_html=True)
+  st.sidebar.success("Fenêtre d'impression ouverte !")
 
 # ---------------------------------------------------------
 # 1. TABLEAU DE BORD
@@ -170,7 +224,6 @@ if section == "Tableau de Bord":
   st.title("🤝 Logiciel de Gestion Financière - Amicale")
   st.markdown("### 📊 Vue d'ensemble de la Trésorerie")
 
-  # Calculs sécurisés
   total_cotiz = (
       pd.to_numeric(df_cotisations["Montant"], errors="coerce").sum()
       if not df_cotisations.empty and "Montant" in df_cotisations.columns
@@ -189,10 +242,7 @@ if section == "Tableau de Bord":
   col3.metric("Total Dépenses / Sorties", f"{total_dep:,.0f} FCFA")
 
   st.markdown("---")
-  st.info(
-      "💡 Utilisez le menu à gauche pour naviguer entre la gestion des"
-      " membres, les cotisations et les simulations de secours."
-  )
+  st.info("💡 Utilisez le menu à gauche pour naviguer dans le logiciel.")
 
 # ---------------------------------------------------------
 # 2. GESTION DES MEMBRES
@@ -208,10 +258,6 @@ elif section == "Gestion des Membres":
     st.subheader("Liste officielle")
     if not df_membres.empty:
       st.dataframe(df_membres, use_container_width=True)
-      st.info(
-          "ℹ️ Vous pouvez imprimer cette liste complète en utilisant le bouton"
-          " 'Imprimer / Exporter cette page' dans le menu latéral."
-      )
     else:
       st.warning("Aucun membre enregistré pour le moment.")
 
@@ -252,61 +298,65 @@ elif section == "Gestion des Membres":
 
   with tab3:
     st.subheader("Modifier ou Supprimer un membre")
-    if not df_membres.empty:
-      liste_ids = df_membres["ID Membre"].tolist()
-      selected_id = st.selectbox(
-          "Sélectionner l'ID du membre à modifier", liste_ids
-      )
-
-      membre_actuel = df_membres[df_membres["ID Membre"] == selected_id].iloc[0]
-
-      with st.form("form_modif_membre"):
-        nouveau_nom = st.text_input(
-            "Nom et Prénoms", value=membre_actuel["Nom et Prénoms"]
-        )
-        nouveau_contact = st.text_input(
-            "Contact Téléphonique", value=membre_actuel["Contact"]
-        )
-        nouveau_statut = st.selectbox(
-            "Statut",
-            ["Actif", "Suspendu", "Retraité"],
-            index=(
-                ["Actif", "Suspendu", "Retraité"].index(
-                    membre_actuel["Statut"]
-                )
-                if membre_actuel["Statut"]
-                in ["Actif", "Suspendu", "Retraité"]
-                else 0
-            ),
+    if not df_membres.empty and "ID Membre" in df_membres.columns:
+      liste_ids = df_membres["ID Membre"].dropna().tolist()
+      if liste_ids:
+        selected_id = st.selectbox(
+            "Sélectionner l'ID du membre à modifier", liste_ids
         )
 
-        col_m1, col_m2 = st.columns(2)
-        submit_mod = col_m1.form_submit_button("Enregistrer les modifications")
-        submit_supp = col_m2.form_submit_button("Supprimer ce membre")
+        membre_actuel = df_membres[
+            df_membres["ID Membre"] == selected_id
+        ].iloc[0]
 
-        if submit_mod:
-          contact_forme = valider_telephone_ivoirien(nouveau_contact)
-          # Mise à jour sécurisée via conversion de type explicite
-          df_membres["ID Membre"] = df_membres["ID Membre"].astype(str)
-          df_membres.loc[
-              df_membres["ID Membre"] == str(selected_id), "Nom et Prénoms"
-          ] = str(nouveau_nom).upper()
-          df_membres.loc[
-              df_membres["ID Membre"] == str(selected_id), "Contact"
-          ] = str(contact_forme)
-          df_membres.loc[
-              df_membres["ID Membre"] == str(selected_id), "Statut"
-          ] = str(nouveau_statut)
+        with st.form("form_modif_membre"):
+          nouveau_nom = st.text_input(
+              "Nom et Prénoms",
+              value=str(membre_actuel.get("Nom et Prénoms", "")),
+          )
+          nouveau_contact = st.text_input(
+              "Contact Téléphonique",
+              value=str(membre_actuel.get("Contact", "")),
+          )
+          statut_actuel = str(membre_actuel.get("Statut", "Actif"))
+          statuts_possibles = ["Actif", "Suspendu", "Retraité"]
+          idx_statut = (
+              statuts_possibles.index(statut_actuel)
+              if statut_actuel in statuts_possibles
+              else 0
+          )
+          nouveau_statut = st.selectbox(
+              "Statut", statuts_possibles, index=idx_statut
+          )
 
-          save_data(df_membres, df_cotisations, df_evenements, df_depenses)
-          st.success("Modifications enregistrées avec succès !")
-          st.rerun()
+          col_m1, col_m2 = st.columns(2)
+          submit_mod = col_m1.form_submit_button("Enregistrer les modifications")
+          submit_supp = col_m2.form_submit_button("Supprimer ce membre")
 
-        if submit_supp:
-          df_membres = df_membres[df_membres["ID Membre"] != selected_id]
-          save_data(df_membres, df_cotisations, df_evenements, df_depenses)
-          st.warning("Membre supprimé.")
-          st.rerun()
+          if submit_mod:
+            contact_forme = valider_telephone_ivoirien(nouveau_contact)
+            df_membres["ID Membre"] = df_membres["ID Membre"].astype(str)
+            df_membres.loc[
+                df_membres["ID Membre"] == str(selected_id), "Nom et Prénoms"
+            ] = str(nouveau_nom).upper()
+            df_membres.loc[
+                df_membres["ID Membre"] == str(selected_id), "Contact"
+            ] = str(contact_forme)
+            df_membres.loc[
+                df_membres["ID Membre"] == str(selected_id), "Statut"
+            ] = str(nouveau_statut)
+
+            save_data(df_membres, df_cotisations, df_evenements, df_depenses)
+            st.success("Modifications enregistrées avec succès !")
+            st.rerun()
+
+          if submit_supp:
+            df_membres = df_membres[df_membres["ID Membre"] != selected_id]
+            save_data(df_membres, df_cotisations, df_evenements, df_depenses)
+            st.warning("Membre supprimé.")
+            st.rerun()
+      else:
+        st.info("Aucun ID membre valide trouvé.")
     else:
       st.info("Aucun membre à modifier.")
 
@@ -318,18 +368,15 @@ elif section == "Cotisations Mensuelles":
   st.markdown("Montant standard par membre : **1 000 FCFA / mois**")
 
   if df_membres.empty:
-    st.warning(
-        "Veuillez d'abord enregistrer des membres dans la section 'Gestion des"
-        " Membres'."
-    )
+    st.warning("Veuillez d'abord enregistrer des membres.")
   else:
     with st.form("form_cotisation"):
-      membre_choisi = st.selectbox(
-          "Sélectionner le membre",
-          df_membres["ID Membre"]
+      options_membres = (
+          df_membres["ID Membre"].astype(str)
           + " - "
-          + df_membres["Nom et Prénoms"],
-      )
+          + df_membres["Nom et Prénoms"].astype(str)
+      ).tolist()
+      membre_choisi = st.selectbox("Sélectionner le membre", options_membres)
       mois = st.selectbox(
           "Mois",
           [
@@ -381,7 +428,7 @@ elif section == "Cotisations Mensuelles":
     if not df_cotisations.empty:
       st.dataframe(df_cotisations, use_container_width=True)
     else:
-      st.info("Aucune cotisation enregistrée pour le moment.")
+      st.info("Aucune cotisation enregistrée.")
 
 # ---------------------------------------------------------
 # 4. CALCULATEUR PRÊTS / SECOURS (Règles 60% / 80%)
@@ -406,8 +453,11 @@ elif section == "Calculateur Prêts / Secours":
       ["Non (Taux de 80%)", "Oui (Taux de 60%)"],
   )
 
-  # Simulation du nombre de cotisants (par défaut l'effectif total actif)
-  nb_actifs = len(df_membres[df_membres["Statut"] == "Actif"])
+  nb_actifs = (
+      len(df_membres[df_membres["Statut"] == "Actif"])
+      if not df_membres.empty and "Statut" in df_membres.columns
+      else len(df_membres)
+  )
   if nb_actifs == 0:
     nb_actifs = len(df_membres)
 
@@ -428,7 +478,6 @@ elif section == "Calculateur Prêts / Secours":
   col_c3.metric(
       f"Montant du Versement ({int(taux*100)}%)",
       f"{montant_versement:,.0f} FCFA",
-      delta="Calcul Automatique",
   )
 
 # ---------------------------------------------------------
@@ -438,7 +487,7 @@ elif section == "Journal des Dépenses":
   st.title("💸 Journal des Dépenses et Sorties")
 
   with st.form("form_depense"):
-    libelle = st.text_input("Libellé de la dépense (ex: Achat de registres)")
+    libelle = st.text_input("Libellé de la dépense")
     montant_dep = st.number_input("Montant (FCFA)", value=5000, step=1000)
     categorie = st.selectbox(
         "Catégorie", ["Fonctionnement", "Secours Versé", "Aide Sociale", "Autre"]
