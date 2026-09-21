@@ -99,8 +99,9 @@ def valider_telephone_ivoirien(tel):
   if len(tel_clean) == 10:
     # Format standard ivoirien (ex: 07 00 00 00 00)
     return f"{tel_clean[0:2]} {tel_clean[2:4]} {tel_clean[4:6]} {tel_clean[6:8]} {tel_clean[8:10]}"
-  return str(tel).strip()  retourne brut si format non reconnu
-
+  return str(
+      tel
+  ).strip()  # Retourne le numéro brut si le format n'est pas reconnu
 
 # Chargement initial
 df_membres, df_cotisations, df_evenements, df_depenses = load_data()
