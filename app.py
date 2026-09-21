@@ -1,162 +1,436 @@
-import streamlit as st
-import pandas as pd
 import os
+import pandas as pd
+import streamlit as st
 
+# Configuration de la page Streamlit
+st.set_page_config(
+    page_title="Logiciel de Gestion Financière - Amicale",
+    page_icon="🤝",
+    layout="wide",
+)
+
+# Nom du fichier de base de données Excel persistant
 DB_FILE = "base_amicale_python.xlsx"
 
-def initialiser_base():
-    if not os.path.exists(DB_FILE):
-        with pd.ExcelWriter(DB_FILE, engine="openpyxl") as writer:
-            df_membres = pd.DataFrame(columns=["ID Membre", "Nom & Prénoms", "Contact", "Date d'adhésion", "Statut"])
-            df_membres.to_excel(writer, sheet_name="Membres", index=False)
-            
-            df_mensuel = pd.DataFrame(columns=["ID Membre", "Nom & Prénoms", "Total Général Versé"])
-            df_mensuel.to_excel(writer, sheet_name="Cotisations_Mensuelles", index=False)
-            
-            df_departs = pd.DataFrame(columns=["ID Membre", "Nom & Prénoms", "Motif", "Total Versé", "A déjà bénéficié ?", "Taux", "Montant Remboursable"])
-            df_departs.to_excel(writer, sheet_name="Retraites_Mutations", index=False)
-            
-            df_decis = pd.DataFrame(columns=["Date", "Type", "Motif", "Caisse Imputée", "Montant"])
-            df_decis.to_excel(writer, sheet_name="Decaissements", index=False)
 
-initialiser_base()
+def init_db():
+  """Initialise le fichier Excel de la base de données s'il n'existe pas."""
+  if not os.path.exists(DB_FILE):
+    # Création des structures par défaut
+    df_membres = pd.DataFrame(
+        columns=[
+            "ID Membre",
+            "Nom et Prénoms",
+            "Contact",
+            "Date Adhesion",
+            "Statut",
+        ]
+    )
+    df_cotisations = pd.DataFrame(
+        columns=[
+            "ID Membre",
+            "Nom et Prénoms",
+            "Mois",
+            "Année",
+            "Montant",
+            "Date Paiement",
+        ]
+    )
+    df_evenements = pd.DataFrame(
+        columns=[
+            "ID Membre",
+            "Nom et Prénoms",
+            "Type Evenement",
+            "Montant Verse",
+            "Date",
+            "Assistance Anterieure",
+        ]
+    )
+    df_depenses = pd.DataFrame(
+        columns=["Libelle", "Montant", "Date", "Categorie"]
+    )
 
-st.set_page_config(page_title="Gestion Financière - Amicale", layout="wide")
+    with pd.ExcelWriter(DB_FILE, engine="openpyxl") as writer:
+      df_membres.to_excel(writer, sheet_name="Membres", index=False)
+      df_cotisations.to_excel(writer, sheet_name="Cotisations", index=False)
+      df_evenements.to_excel(writer, sheet_name="Evenements", index=False)
+      df_depenses.to_excel(writer, sheet_name="Depenses", index=False)
 
-st.title("🤝 Logiciel de Gestion Financière - Amicale")
-st.sidebar.header("Navigation")
 
-menu = st.sidebar.selectbox("Choisir une section", ["Tableau de Bord", "Gestion des Membres", "Retraites & Mutations", "Décaissements"])
+init_db()
 
-if menu == "Tableau de Bord":
-    st.subheader("📊 Vue d'ensemble de la Trésorerie")
-    
-    xls = pd.ExcelFile(DB_FILE)
-    df_mens = pd.read_excel(xls, "Cotisations_Mensuelles")
-    df_decis = pd.read_excel(xls, "Decaissements")
-    df_departs = pd.read_excel(xls, "Retraites_Mutations")
-    
-    total_cotis = df_mens["Total Général Versé"].sum() if not df_mens.empty else 0
-    total_rembours = df_departs["Montant Remboursable"].sum() if not df_departs.empty else 0
-    
-    st.metric("Total Cotisations Mensuelles Perçues", f"{total_cotis:,.0f} FCFA")
-    st.metric("Total Remboursements Versés (Retraites/Mutations)", f"{total_rembours:,.0f} FCFA")
 
-elif menu == "Gestion des Membres":
-    st.subheader("👥 Gestion des Membres (Ajout, Modification, Suppression)")
-    
-    df_membres = pd.read_excel(DB_FILE, sheet_name="Membres")
-    
-    # Onglets pour séparer l'ajout, la modification et la suppression
-    tab_liste, tab_ajout, tab_modif, tab_suppr = st.tabs(["Liste des Membres", "Ajouter un Membre", "Modifier un Membre", "Supprimer un Membre"])
-    
-    with tab_liste:
-        st.dataframe(df_membres, use_container_width=True)
-        
-    with tab_ajout:
-        with st.form("ajout_membre"):
-            st.write("Ajouter un nouveau membre")
-            id_m = st.text_input("ID Membre (ex: M005)")
-            nom_m = st.text_input("Nom & Prénoms")
-            contact_m = st.text_input("Contact")
-            date_adh = st.date_input("Date d'adhésion")
-            submit = st.form_submit_button("Enregistrer")
-            
-            if submit and id_m and nom_m:
-                new_row = pd.DataFrame([[id_m, nom_m, contact_m, str(date_adh), "Actif"]], 
-                                       columns=["ID Membre", "Nom & Prénoms", "Contact", "Date d'adhésion", "Statut"])
-                df_membres = pd.concat([df_membres, new_row], ignore_index=True)
-                with pd.ExcelWriter(DB_FILE, engine="openpyxl", mode="a", if_sheet_exists="replace") as writer:
-                    df_membres.to_excel(writer, sheet_name="Membres", index=False)
-                st.success("Membre ajouté avec succès ! (Rafraîchissez pour voir)")
+def load_data():
+  """Charge toutes les tables depuis le fichier Excel."""
+  try:
+    df_membres = pd.read_excel(DB_FILE, sheet_name="Membres", dtype=str)
+    df_cotisations = pd.read_excel(DB_FILE, sheet_name="Cotisations", dtype=str)
+    df_evenements = pd.read_excel(DB_FILE, sheet_name="Evenements", dtype=str)
+    df_depenses = pd.read_excel(DB_FILE, sheet_name="Depenses", dtype=str)
+    return df_membres, df_cotisations, df_evenements, df_depenses
+  except Exception as e:
+    st.error(f"Erreur lors du chargement des données : {e}")
+    # Retour de DataFrames vides en cas de corruption
+    return (
+        pd.DataFrame(),
+        pd.DataFrame(),
+        pd.DataFrame(),
+        pd.DataFrame(),
+    )
 
-    with tab_modif:
-        if df_membres.empty:
-            st.info("Aucun membre enregistré pour le moment.")
+
+def save_data(df_membres, df_cotisations, df_evenements, df_depenses):
+  """Sauvegarde toutes les tables dans le fichier Excel avec gestion des types."""
+  with pd.ExcelWriter(DB_FILE, engine="openpyxl") as writer:
+    df_membres.to_excel(writer, sheet_name="Membres", index=False)
+    df_cotisations.to_excel(writer, sheet_name="Cotisations", index=False)
+    df_evenements.to_excel(writer, sheet_name="Evenements", index=False)
+    df_depenses.to_excel(writer, sheet_name="Depenses", index=False)
+
+
+def valider_telephone_ivoirien(tel):
+  """Vérifie et formate un numéro de téléphone selon les standards ivoiriens (10 chiffres)."""
+  if not tel or pd.isna(tel):
+    return ""
+  # Nettoyage des espaces et tirets
+  tel_clean = "".join(filter(str.isdigit, str(tel)))
+  if tel_clean.startswith("225") and len(tel_clean) == 13:
+    tel_clean = tel_clean[3:]  # Retirer l'indicatif pays si présent
+  if len(tel_clean) == 10:
+    # Format standard ivoirien (ex: 07 00 00 00 00)
+    return f"{tel_clean[0:2]} {tel_clean[2:4]} {tel_clean[4:6]} {tel_clean[6:8]} {tel_clean[8:10]}"
+  return str(tel).strip()  retourne brut si format non reconnu
+
+
+# Chargement initial
+df_membres, df_cotisations, df_evenements, df_depenses = load_data()
+
+# Barre latérale de navigation
+st.sidebar.title("Navigation")
+section = st.sidebar.selectbox(
+    "Choisir une section",
+    [
+        "Tableau de Bord",
+        "Gestion des Membres",
+        "Cotisations Mensuelles",
+        "Calculateur Prêts / Secours",
+        "Journal des Dépenses",
+    ],
+)
+
+# Option d'impression globale accessible sur toutes les pages
+st.sidebar.markdown("---")
+st.sidebar.subheader("🖨️ Impression & Export")
+if st.sidebar.button("Imprimer / Exporter cette page"):
+  st.markdown(
+      "<script>window.print();</script>", unsafe_allow_html=True
+  )
+  st.sidebar.success(
+      "Fenêtre d'impression ouverte ! (Vous pouvez enregistrer en PDF)."
+  )
+
+# ---------------------------------------------------------
+# 1. TABLEAU DE BORD
+# ---------------------------------------------------------
+if section == "Tableau de Bord":
+  st.title("🤝 Logiciel de Gestion Financière - Amicale")
+  st.markdown("### 📊 Vue d'ensemble de la Trésorerie")
+
+  # Calculs sécurisés
+  total_cotiz = (
+      pd.to_numeric(df_cotisations["Montant"], errors="coerce").sum()
+      if not df_cotisations.empty and "Montant" in df_cotisations.columns
+      else 0
+  )
+  total_dep = (
+      pd.to_numeric(df_depenses["Montant"], errors="coerce").sum()
+      if not df_depenses.empty and "Montant" in df_depenses.columns
+      else 0
+  )
+  nb_membres = len(df_membres) if not df_membres.empty else 0
+
+  col1, col2, col3 = st.columns(3)
+  col1.metric("Membres Inscrits", f"{nb_membres}")
+  col2.metric("Total Cotisations Perçues", f"{total_cotiz:,.0f} FCFA")
+  col3.metric("Total Dépenses / Sorties", f"{total_dep:,.0f} FCFA")
+
+  st.markdown("---")
+  st.info(
+      "💡 Utilisez le menu à gauche pour naviguer entre la gestion des"
+      " membres, les cotisations et les simulations de secours."
+  )
+
+# ---------------------------------------------------------
+# 2. GESTION DES MEMBRES
+# ---------------------------------------------------------
+elif section == "Gestion des Membres":
+  st.title("👥 Gestion des Membres de l'Amicale")
+
+  tab1, tab2, tab3 = st.tabs(
+      ["Liste des Membres", "Ajouter un Membre", "Modifier / Supprimer"]
+  )
+
+  with tab1:
+    st.subheader("Liste officielle")
+    if not df_membres.empty:
+      st.dataframe(df_membres, use_container_width=True)
+      st.info(
+          "ℹ️ Vous pouvez imprimer cette liste complète en utilisant le bouton"
+          " 'Imprimer / Exporter cette page' dans le menu latéral."
+      )
+    else:
+      st.warning("Aucun membre enregistré pour le moment.")
+
+  with tab2:
+    st.subheader("Enregistrer un nouveau membre")
+    with st.form("form_ajout_membre"):
+      id_membre = st.text_input(
+          "ID Membre (ex: AMA-091)",
+          value=f"AMA-{len(df_membres)+1:03d}",
+      )
+      nom = st.text_input("Nom et Prénoms")
+      contact = st.text_input("Contact Téléphonique (ex: 0701020304)")
+      date_adhesion = st.date_input("Date d'adhésion")
+      statut = st.selectbox("Statut", ["Actif", "Suspendu", "Retraité"])
+
+      submit_ajout = st.form_submit_button("Ajouter le membre")
+
+      if submit_ajout:
+        if nom.strip() == "":
+          st.error("Le nom et prénoms sont obligatoires.")
         else:
-            id_a_modifier = st.selectbox("Sélectionner le membre à modifier", df_membres["ID Membre"].astype(str) + " - " + df_membres["Nom & Prénoms"])
-            if id_a_modifier:
-                selected_id = id_a_modifier.split(" - ")[0]
-                membre_data = df_membres[df_membres["ID Membre"].astype(str) == selected_id].iloc[0]
-                
-                with st.form("form_modif"):
-                    nouveau_nom = st.text_input("Nom & Prénoms", value=str(membre_data["Nom & Prénoms"]))
-                    nouveau_contact = st.text_input("Contact", value=str(membre_data["Contact"]))
-                    nouveau_statut = st.selectbox("Statut", ["Actif", "Retraité", "Muté", "Suspendu"], index=0)
-                    
-                    btn_sauver_modif = st.form_submit_button("Enregistrer les modifications")
-                    
-                    if btn_sauver_modif:
-                        df_membres.loc[df_membres["ID Membre"].astype(str) == selected_id, "Nom & Prénoms"] = nouveau_nom
-                        df_membres.loc[df_membres["ID Membre"].astype(str) == selected_id, "Contact"] = nouveau_contact
-                        df_membres.loc[df_membres["ID Membre"].astype(str) == selected_id, "Statut"] = nouveau_statut
-                        
-                        with pd.ExcelWriter(DB_FILE, engine="openpyxl", mode="a", if_sheet_exists="replace") as writer:
-                            df_membres.to_excel(writer, sheet_name="Membres", index=False)
-                        st.success("Modifications enregistrées avec succès !")
+          contact_forme = valider_telephone_ivoirien(contact)
+          nouveau_ligne = pd.DataFrame(
+              [
+                  {
+                      "ID Membre": str(id_membre).strip(),
+                      "Nom et Prénoms": str(nom).strip().upper(),
+                      "Contact": str(contact_forme),
+                      "Date Adhesion": str(date_adhesion),
+                      "Statut": str(statut),
+                  }
+              ]
+          )
+          df_membres = pd.concat([df_membres, nouveau_ligne], ignore_index=True)
+          save_data(df_membres, df_cotisations, df_evenements, df_depenses)
+          st.success(f"Membre {nom} ajouté avec succès !")
+          st.rerun()
 
-    with tab_suppr:
-        if df_membres.empty:
-            st.info("Aucun membre enregistré pour le moment.")
-        else:
-            id_a_supprimer = st.selectbox("Sélectionner le membre à supprimer", df_membres["ID Membre"].astype(str) + " - " + df_membres["Nom & Prénoms"], key="suppr_select")
-            if st.button("Supprimer définitivement ce membre", type="primary"):
-                selected_id = id_a_supprimer.split(" - ")[0]
-                df_membres = df_membres[df_membres["ID Membre"].astype(str) != selected_id]
-                
-                with pd.ExcelWriter(DB_FILE, engine="openpyxl", mode="a", if_sheet_exists="replace") as writer:
-                    df_membres.to_excel(writer, sheet_name="Membres", index=False)
-                st.success("Membre supprimé avec succès !")
+  with tab3:
+    st.subheader("Modifier ou Supprimer un membre")
+    if not df_membres.empty:
+      liste_ids = df_membres["ID Membre"].tolist()
+      selected_id = st.selectbox(
+          "Sélectionner l'ID du membre à modifier", liste_ids
+      )
 
-elif menu == "Retraites & Mutations":
-    st.subheader("🚪 Gestion des Départs (80% / 60%)")
-    st.info("Règle : 80% des cotisations si aucune assistance reçue, 60% sinon.")
-    
-    df_departs = pd.read_excel(DB_FILE, sheet_name="Retraites_Mutations")
-    st.dataframe(df_departs, use_container_width=True)
-    
-    with st.form("calcul_depart"):
-        id_Membre_dep = st.text_input("ID du Membre concerné")
-        nom_dep = st.text_input("Nom & Prénoms")
-        motif_dep = st.selectbox("Motif", ["Retraite", "Mutation"])
-        total_verse_dep = st.number_input("Total des cotisations versées par le membre (FCFA)", min_value=0, step=1000)
-        assistance = st.selectbox("A déjà bénéficié d'une assistance (Mariage/Décès/Naissance) ?", ["Non", "Oui"])
-        
-        btn_calc = st.form_submit_button("Calculer et Enregistrer le Départ")
-        
-        if btn_calc and id_Membre_dep:
-            taux = 0.60 if assistance == "Oui" else 0.80
-            montant_rembours = total_verse_dep * taux
-            
-            new_dep = pd.DataFrame([[id_Membre_dep, nom_dep, motif_dep, total_verse_dep, assistance, taux, montant_rembours]],
-                                   columns=["ID Membre", "Nom & Prénoms", "Motif", "Total Versé", "A déjà bénéficié ?", "Taux", "Montant Remboursable"])
-            df_departs = pd.concat([df_departs, new_dep], ignore_index=True)
-            
-            with pd.ExcelWriter(DB_FILE, engine="openpyxl", mode="a", if_sheet_exists="replace") as writer:
-                df_departs.to_excel(writer, sheet_name="Retraites_Mutations", index=False)
-            st.success(f"Calcul effectué ! Montant à verser : {montant_rembours:,.0f} FCFA (Taux appliqué : {int(taux*100)}%)")
+      membre_actuel = df_membres[df_membres["ID Membre"] == selected_id].iloc[0]
 
-elif menu == "Décaissements":
-    st.subheader("💸 Registre des Dépenses et Sorties de Caisse")
-    
-    df_decis = pd.read_excel(DB_FILE, sheet_name="Decaissements")
-    st.dataframe(df_decis, use_container_width=True)
-    
-    with st.form("ajout_decis"):
-        st.write("Enregistrer une nouvelle sortie d'argent")
-        date_decis = st.date_input("Date du décaissement")
-        type_decis = st.selectbox("Type de Sortie", ["Dépense Générale", "Aide Événement", "Remboursement Retraite/Mutation"])
-        motif_decis = st.text_input("Motif / Bénéficiaire (ex: Fonctionnement bureau, Mariage de X...)")
-        caisse_imput = st.selectbox("Caisse Imputée", ["Caisse Mensuelle", "Caisse Événements (Collecte dédiée)"])
-        montant_decis = st.number_input("Montant (FCFA)", min_value=0, step=1000)
-        
-        submit_decis = st.form_submit_button("Enregistrer le Décaissement")
-        
-        if submit_decis and motif_decis:
-            new_d = pd.DataFrame([[str(date_decis), type_decis, motif_decis, caisse_imput, montant_decis]],
-                                 columns=["Date", "Type", "Motif", "Caisse Imputée", "Montant"])
-            df_decis = pd.concat([df_decis, new_d], ignore_index=True)
-            
-            with pd.ExcelWriter(DB_FILE, engine="openpyxl", mode="a", if_sheet_exists="replace") as writer:
-                df_decis.to_excel(writer, sheet_name="Decaissements", index=False)
-            st.success("Décaissement enregistré avec succès !")
+      with st.form("form_modif_membre"):
+        nouveau_nom = st.text_input(
+            "Nom et Prénoms", value=membre_actuel["Nom et Prénoms"]
+        )
+        nouveau_contact = st.text_input(
+            "Contact Téléphonique", value=membre_actuel["Contact"]
+        )
+        nouveau_statut = st.selectbox(
+            "Statut",
+            ["Actif", "Suspendu", "Retraité"],
+            index=(
+                ["Actif", "Suspendu", "Retraité"].index(
+                    membre_actuel["Statut"]
+                )
+                if membre_actuel["Statut"]
+                in ["Actif", "Suspendu", "Retraité"]
+                else 0
+            ),
+        )
+
+        col_m1, col_m2 = st.columns(2)
+        submit_mod = col_m1.form_submit_button("Enregistrer les modifications")
+        submit_supp = col_m2.form_submit_button("Supprimer ce membre")
+
+        if submit_mod:
+          contact_forme = valider_telephone_ivoirien(nouveau_contact)
+          # Mise à jour sécurisée via conversion de type explicite
+          df_membres["ID Membre"] = df_membres["ID Membre"].astype(str)
+          df_membres.loc[
+              df_membres["ID Membre"] == str(selected_id), "Nom et Prénoms"
+          ] = str(nouveau_nom).upper()
+          df_membres.loc[
+              df_membres["ID Membre"] == str(selected_id), "Contact"
+          ] = str(contact_forme)
+          df_membres.loc[
+              df_membres["ID Membre"] == str(selected_id), "Statut"
+          ] = str(nouveau_statut)
+
+          save_data(df_membres, df_cotisations, df_evenements, df_depenses)
+          st.success("Modifications enregistrées avec succès !")
+          st.rerun()
+
+        if submit_supp:
+          df_membres = df_membres[df_membres["ID Membre"] != selected_id]
+          save_data(df_membres, df_cotisations, df_evenements, df_depenses)
+          st.warning("Membre supprimé.")
+          st.rerun()
+    else:
+      st.info("Aucun membre à modifier.")
+
+# ---------------------------------------------------------
+# 3. COTISATIONS MENSUELLES
+# ---------------------------------------------------------
+elif section == "Cotisations Mensuelles":
+  st.title("💰 Gestion des Cotisations Mensuelles")
+  st.markdown("Montant standard par membre : **1 000 FCFA / mois**")
+
+  if df_membres.empty:
+    st.warning(
+        "Veuillez d'abord enregistrer des membres dans la section 'Gestion des"
+        " Membres'."
+    )
+  else:
+    with st.form("form_cotisation"):
+      membre_choisi = st.selectbox(
+          "Sélectionner le membre",
+          df_membres["ID Membre"]
+          + " - "
+          + df_membres["Nom et Prénoms"],
+      )
+      mois = st.selectbox(
+          "Mois",
+          [
+              "Janvier",
+              "Février",
+              "Mars",
+              "Avril",
+              "Mai",
+              "Juin",
+              "Juillet",
+              "Août",
+              "Septembre",
+              "Octobre",
+              "Novembre",
+              "Décembre",
+          ],
+      )
+      annee = st.selectbox("Année", ["2025", "2026", "2027"])
+      montant = st.number_input("Montant (FCFA)", value=1000, step=500)
+
+      submit_cotiz = st.form_submit_button("Enregistrer la cotisation")
+
+      if submit_cotiz:
+        id_m = membre_choisi.split(" - ")[0]
+        nom_m = membre_choisi.split(" - ")[1]
+        nouvelle_cotiz = pd.DataFrame(
+            [
+                {
+                    "ID Membre": str(id_m),
+                    "Nom et Prénoms": str(nom_m),
+                    "Mois": str(mois),
+                    "Année": str(annee),
+                    "Montant": str(montant),
+                    "Date Paiement": str(pd.Timestamp.now().strftime("%Y-%m-%d")),
+                }
+            ]
+        )
+        df_cotisations = pd.concat(
+            [df_cotisations, nouvelle_cotiz], ignore_index=True
+        )
+        save_data(df_membres, df_cotisations, df_evenements, df_depenses)
+        st.success(
+            f"Cotisation de {montant} FCFA enregistrée pour {nom_m} ({mois}"
+            f" {annee})."
+        )
+        st.rerun()
+
+    st.subheader("Historique des Cotisations")
+    if not df_cotisations.empty:
+      st.dataframe(df_cotisations, use_container_width=True)
+    else:
+      st.info("Aucune cotisation enregistrée pour le moment.")
+
+# ---------------------------------------------------------
+# 4. CALCULATEUR PRÊTS / SECOURS (Règles 60% / 80%)
+# ---------------------------------------------------------
+elif section == "Calculateur Prêts / Secours":
+  st.title("📐 Calculateur des Versements (Règles 60% / 80%)")
+  st.markdown(
+      "Règles financières : **80%** du total si aucune assistance antérieure;"
+      " **60%** si déjà perçu."
+  )
+
+  type_secours = st.selectbox(
+      "Type d'événement",
+      [
+          "Naissance (2 000 FCFA par membre)",
+          "Décès Parent (5 000 FCFA par membre)",
+          "Décès Membre (10 000 FCFA par membre)",
+      ],
+  )
+  deja_recu = st.radio(
+      "Le membre a-t-il déjà reçu une assistance antérieure ?",
+      ["Non (Taux de 80%)", "Oui (Taux de 60%)"],
+  )
+
+  # Simulation du nombre de cotisants (par défaut l'effectif total actif)
+  nb_actifs = len(df_membres[df_membres["Statut"] == "Actif"])
+  if nb_actifs == 0:
+    nb_actifs = len(df_membres)
+
+  cotisation_unitaire = 2000
+  if "Décès Parent" in type_secours:
+    cotisation_unitaire = 5000
+  elif "Décès Membre" in type_secours:
+    cotisation_unitaire = 10000
+
+  total_attendu = nb_actifs * cotisation_unitaire
+  taux = 0.80 if "Non" in deja_recu else 0.60
+  montant_versement = total_attendu * taux
+
+  st.markdown("---")
+  col_c1, col_c2, col_c3 = st.columns(3)
+  col_c1.metric("Membres Cotisants pris en compte", f"{nb_actifs}")
+  col_c2.metric("Total Théorique Collecté", f"{total_attendu:,.0f} FCFA")
+  col_c3.metric(
+      f"Montant du Versement ({int(taux*100)}%)",
+      f"{montant_versement:,.0f} FCFA",
+      delta="Calcul Automatique",
+  )
+
+# ---------------------------------------------------------
+# 5. JOURNAL DES DÉPENSES
+# ---------------------------------------------------------
+elif section == "Journal des Dépenses":
+  st.title("💸 Journal des Dépenses et Sorties")
+
+  with st.form("form_depense"):
+    libelle = st.text_input("Libellé de la dépense (ex: Achat de registres)")
+    montant_dep = st.number_input("Montant (FCFA)", value=5000, step=1000)
+    categorie = st.selectbox(
+        "Catégorie", ["Fonctionnement", "Secours Versé", "Aide Sociale", "Autre"]
+    )
+    date_dep = st.date_input("Date de la dépense")
+
+    submit_dep = st.form_submit_button("Enregistrer la dépense")
+
+    if submit_dep:
+      nouvelle_dep = pd.DataFrame(
+          [
+              {
+                  "Libelle": str(libelle),
+                  "Montant": str(montant_dep),
+                  "Date": str(date_dep),
+                  "Categorie": str(categorie),
+              }
+          ]
+      )
+      df_depenses = pd.concat([df_depenses, nouvelle_dep], ignore_index=True)
+      save_data(df_membres, df_cotisations, df_evenements, df_depenses)
+      st.success("Dépense enregistrée avec succès !")
+      st.rerun()
+
+  st.subheader("Historique des Dépenses")
+  if not df_depenses.empty:
+    st.dataframe(df_depenses, use_container_width=True)
+  else:
+    st.info("Aucune dépense enregistrée.")
