@@ -112,9 +112,6 @@ def load_data():
     save_data(df_membres, df_cotisations, df_evenements, df_depenses)
     return df_membres, df_cotisations, df_evenements, df_depenses
 
-    )
-
-
 def save_data(df_membres, df_cotisations, df_evenements, df_depenses):
   """Sauvegarde toutes les tables dans le fichier Excel avec gestion des types."""
   with pd.ExcelWriter(DB_FILE, engine="openpyxl") as writer:
