@@ -60,7 +60,7 @@ init_db()
 
 
 def load_data():
-  """Charge toutes les tables depuis le fichier Excel avec normalisation des colonnes."""
+  """Charge toutes les tables et nettoie les doublons de colonnes."""
   try:
     xls = pd.ExcelFile(DB_FILE)
     sheets = xls.sheet_names
@@ -68,17 +68,22 @@ def load_data():
     # Membres
     if "Membres" in sheets:
       df_membres = pd.read_excel(DB_FILE, sheet_name="Membres", dtype=str)
-      # Normalisation des noms de colonnes si besoin
       df_membres.columns = df_membres.columns.str.strip()
-      for col in [
+      # Supprimer les colonnes en double s'il y en a
+      df_membres = df_membres.loc[:, ~df_membres.columns.duplicated()]
+
+      # S'assurer d'avoir exactement les bonnes colonnes dans le bon ordre
+      colonnes_officielles = [
           "ID Membre",
           "Nom et Prénoms",
           "Contact",
           "Date Adhesion",
           "Statut",
-      ]:
+      ]
+      for col in colonnes_officielles:
         if col not in df_membres.columns:
           df_membres[col] = ""
+      df_membres = df_membres[colonnes_officielles]
     else:
       df_membres = pd.DataFrame(
           columns=[
@@ -89,6 +94,86 @@ def load_data():
               "Statut",
           ]
       )
+
+    # Cotisations
+    df_cotisations = (
+        pd.read_excel(DB_FILE, sheet_name="Cotisations", dtype=str)
+        if "Cotisations" in sheets
+        else pd.DataFrame(
+            columns=[
+                "ID Membre",
+                "Nom et Prénoms",
+                "Mois",
+                "Année",
+                "Montant",
+                "Date Paiement",
+            ]
+        )
+    )
+    df_cotisations = df_cotisations.loc[:, ~df_cotisations.columns.duplicated()]
+
+    # Evenements
+    df_evenements = (
+        pd.read_excel(DB_FILE, sheet_name="Evenements", dtype=str)
+        if "Evenements" in sheets
+        else pd.DataFrame(
+            columns=[
+                "ID Membre",
+                "Nom et Prénoms",
+                "Type Evenement",
+                "Montant Verse",
+                "Date",
+                "Assistance Anterieure",
+            ]
+        )
+    )
+    df_evenements = df_evenements.loc[:, ~df_evenements.columns.duplicated()]
+
+    # Depenses
+    df_depenses = (
+        pd.read_excel(DB_FILE, sheet_name="Depenses", dtype=str)
+        if "Depenses" in sheets
+        else pd.DataFrame(columns=["Libelle", "Montant", "Date", "Categorie"])
+    )
+    df_depenses = df_depenses.loc[:, ~df_depenses.columns.duplicated()]
+
+    return df_membres, df_cotisations, df_evenements, df_depenses
+  except Exception as e:
+    # Réinitialisation propre en cas d'erreur
+    df_membres = pd.DataFrame(
+        columns=[
+            "ID Membre",
+            "Nom et Prénoms",
+            "Contact",
+            "Date Adhesion",
+            "Statut",
+        ]
+    )
+    df_cotisations = pd.DataFrame(
+        columns=[
+            "ID Membre",
+            "Nom et Prénoms",
+            "Mois",
+            "Année",
+            "Montant",
+            "Date Paiement",
+        ]
+    )
+    df_evenements = pd.DataFrame(
+        columns=[
+            "ID Membre",
+            "Nom et Prénoms",
+            "Type Evenement",
+            "Montant Verse",
+            "Date",
+            "Assistance Anterieure",
+        ]
+    )
+    df_depenses = pd.DataFrame(
+        columns=["Libelle", "Montant", "Date", "Categorie"]
+    )
+    save_data(df_membres, df_cotisations, df_evenements, df_depenses)
+    return df_membres, df_cotisations, df_evenements, df_depenses
 
     # Cotisations
     if "Cotisations" in sheets:
