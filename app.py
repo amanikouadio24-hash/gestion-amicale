@@ -61,21 +61,56 @@ init_db()
 
 
 def load_data():
-  """Charge toutes les tables depuis le fichier Excel."""
+  """Charge toutes les tables depuis le fichier Excel et crée les feuilles manquantes si besoin."""
   try:
-    df_membres = pd.read_excel(DB_FILE, sheet_name="Membres", dtype=str)
-    df_cotisations = pd.read_excel(DB_FILE, sheet_name="Cotisations", dtype=str)
-    df_evenements = pd.read_excel(DB_FILE, sheet_name="Evenements", dtype=str)
-    df_depenses = pd.read_excel(DB_FILE, sheet_name="Depenses", dtype=str)
+    # Vérifier quelles feuilles existent dans le fichier Excel
+    xls = pd.ExcelFile(DB_FILE)
+    sheets = xls.sheet_names
+
+    df_membres = (
+        pd.read_excel(DB_FILE, sheet_name="Membres", dtype=str)
+        if "Membres" in sheets
+        else pd.DataFrame(
+            columns=["ID Membre", "Nom et Prénoms", "Contact", "Date Adhesion", "Statut"]
+        )
+    )
+    df_cotisations = (
+        pd.read_excel(DB_FILE, sheet_name="Cotisations", dtype=str)
+        if "Cotisations" in sheets
+        else pd.DataFrame(
+            columns=["ID Membre", "Nom et Prénoms", "Mois", "Année", "Montant", "Date Paiement"]
+        )
+    )
+    df_evenements = (
+        pd.read_excel(DB_FILE, sheet_name="Evenements", dtype=str)
+        if "Evenements" in sheets
+        else pd.DataFrame(
+            columns=["ID Membre", "Nom et Prénoms", "Type Evenement", "Montant Verse", "Date", "Assistance Anterieure"]
+        )
+    )
+    df_depenses = (
+        pd.read_excel(DB_FILE, sheet_name="Depenses", dtype=str)
+        if "Depenses" in sheets
+        else pd.DataFrame(columns=["Libelle", "Montant", "Date", "Categorie"])
+    )
+
     return df_membres, df_cotisations, df_evenements, df_depenses
   except Exception as e:
-    st.error(f"Erreur lors du chargement des données : {e}")
-    # Retour de DataFrames vides en cas de corruption
-    return (
-        pd.DataFrame(),
-        pd.DataFrame(),
-        pd.DataFrame(),
-        pd.DataFrame(),
+    # Si le fichier est corrompu ou illisible, on le réinitialise
+    df_membres = pd.DataFrame(
+        columns=["ID Membre", "Nom et Prénoms", "Contact", "Date Adhesion", "Statut"]
+    )
+    df_cotisations = pd.DataFrame(
+        columns=["ID Membre", "Nom et Prénoms", "Mois", "Année", "Montant", "Date Paiement"]
+    )
+    df_evenements = pd.DataFrame(
+        columns=["ID Membre", "Nom et Prénoms", "Type Evenement", "Montant Verse", "Date", "Assistance Anterieure"]
+    )
+    df_depenses = pd.DataFrame(
+        columns=["Libelle", "Montant", "Date", "Categorie"]
+    )
+    save_data(df_membres, df_cotisations, df_evenements, df_depenses)
+    return df_membres, df_cotisations, df_evenements, df_depenses
     )
 
 
